@@ -1,0 +1,15 @@
+{
+  "fields": [
+    {
+      "id": "f1780506715193817",
+      "field": "nama",
+      "custom_text": "",
+      "x_pct": 50.22883295194508,
+      "y_pct": 45.48415849920332,
+      "font_size": 65,
+      "color": "#000000",
+      "bold": false,
+      "align": "center"
+    }
+  ]
+}

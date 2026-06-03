@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kelola Mahasiswa — QR Presensi</title>
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+      tailwind.config = {
+          theme: {
+              extend: {
+                  fontFamily: {
+                      sans: ['Inter', 'sans-serif'],
+                      outfit: ['Outfit', 'sans-serif'],
+                  },
+                  colors: {
+                      brand: {
+                          50: '#fbf9f4',
+                          100: '#f5efe0',
+                          200: '#e8dcbe',
+                          300: '#d7c191',
+                          400: '#c5a059', // Elegant Gold
+                          500: '#b88d44',
+                          600: '#9d7134',
+                          700: '#7f5627',
+                          800: '#674421',
+                          900: '#54361d',
+                      },
+                      darkbg: '#0b0f19',
+                      darkcard: '#161d30',
+                  }
+              }
+          }
+      }
+  </script>
+  
+  <style>
+      body {
+          font-family: 'Inter', sans-serif;
+          background-color: #0b0f19;
+          background-image: radial-gradient(circle at 10% 20%, rgba(197, 160, 89, 0.05) 0%, transparent 40%),
+                            radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 40%);
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+          background: #111827;
+      }
+      ::-webkit-scrollbar-thumb {
+          background: #374151;
+          border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+          background: #4b5563;
+      }
+      .modal-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.75);
+          z-index: 50;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          backdrop-filter: blur(4px);
+      }
+      .modal-overlay.open {
+          display: flex;
+      }
+      @keyframes slideUp {
+          from { transform: translateY(12px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+      }
+      .animate-slideUp {
+          animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen pb-12">
+
+    <!-- Navigation / Header -->
+    <header class="border-b border-slate-800 bg-darkbg/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-400 to-blue-500 flex items-center justify-center shadow-lg shadow-brand-400/20">
+                    <svg class="w-6 h-6 text-darkbg stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM13.5 16.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75v-1.5zM13.5 19.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75v-1.5zM17.5 16.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75v-1.5zM17.5 19.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75v-1.5z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold font-outfit tracking-wide bg-gradient-to-r from-white via-slate-100 to-brand-300 bg-clip-text text-transparent">QR-PRESENSI</h1>
+                    <p class="text-xs text-slate-500 font-medium">Panitia Presensi Berbahagialah</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-6 text-sm font-semibold">
+                <a href="/" class="text-slate-400 hover:text-white transition-colors">Dashboard</a>
+                <a href="/mahasiswa" class="text-brand-300 font-bold border-b-2 border-brand-400 pb-1">Mahasiswa</a>
+                <a href="/scanner" class="text-slate-400 hover:text-white transition-colors">Scanner</a>
+                <a href="/custom-sertifikat" class="text-slate-400 hover:text-white transition-colors">Sertifikat</a>
+                <a href="/custom-email" class="text-slate-400 hover:text-white transition-colors">Custom Email</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <div>
+                <h2 class="text-2xl font-bold font-outfit text-white">Kelola <span class="text-brand-400">Mahasiswa</span></h2>
+                <p class="text-sm text-slate-400 mt-1">Tambah, edit, dan hapus data peserta presensi secara dinamis.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="/download-template-excel" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-all" title="Unduh Format Template Excel">
+                    <span>📥 Template Excel</span>
+                </a>
+                <label class="flex items-center space-x-2 bg-violet-900/40 hover:bg-violet-800/50 text-violet-300 border border-violet-700/60 hover:border-violet-600 px-4 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all">
+                    <svg id="excel-spinner" class="hidden animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span>📥 Import Excel</span>
+                    <input id="excel-input" type="file" accept=".xlsx,.xls" class="hidden" onchange="importExcel(this)"/>
+                </label>
+                <button onclick="openCreateModal()" class="flex items-center space-x-2 bg-gradient-to-r from-brand-400 to-brand-500 hover:from-brand-500 hover:to-brand-600 text-darkbg font-bold px-4 py-2.5 rounded-xl text-sm transition-all">
+                    <span>＋</span>
+                    <span>Tambah Mahasiswa</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Card 1: Total Mhs -->
+            <div class="bg-darkcard border border-slate-800/80 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Total</p>
+                    <h3 id="st-total" class="text-2xl font-bold font-outfit text-white">—</h3>
+                </div>
+                <div class="p-2.5 bg-slate-800/60 rounded-xl text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 005.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+            </div>
+            <!-- Card 2: Hadir -->
+            <div class="bg-darkcard border border-slate-800/80 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Hadir</p>
+                    <h3 id="st-hadir" class="text-2xl font-bold font-outfit text-emerald-400">—</h3>
+                </div>
+                <div class="p-2.5 bg-emerald-950/40 rounded-xl text-emerald-400 border border-emerald-900/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            <!-- Card 3: Belum Hadir -->
+            <div class="bg-darkcard border border-slate-800/80 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Belum Hadir</p>
+                    <h3 id="st-belum" class="text-2xl font-bold font-outfit text-rose-400">—</h3>
+                </div>
+                <div class="p-2.5 bg-rose-950/40 rounded-xl text-rose-400 border border-rose-900/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            <!-- Card 4: Sertifikat Terkirim -->
+            <div class="bg-darkcard border border-slate-800/80 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Sertifikat Terkirim</p>
+                    <h3 id="st-cert" class="text-2xl font-bold font-outfit text-purple-400">—</h3>
+                </div>
+                <div class="p-2.5 bg-purple-950/40 rounded-xl text-purple-400 border border-purple-900/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters & Search Toolbar -->
+        <div class="flex flex-wrap gap-4 items-center justify-between mb-6">
+            <div class="flex flex-wrap gap-3 items-center flex-1 min-w-[300px]">
+                <div class="relative flex-1 min-w-[240px]">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </span>
+                    <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari nama, NIM, atau email..." class="w-full bg-slate-900 border border-slate-700/80 focus:border-brand-400 focus:outline-none rounded-xl py-2 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-500 transition-colors"/>
+                </div>
+                <select id="filterStatus" onchange="renderTable()" class="bg-slate-900 border border-slate-700/80 focus:border-brand-400 focus:outline-none rounded-xl py-2 px-3 text-xs text-slate-200 cursor-pointer transition-colors">
+                    <option value="all">Semua Status</option>
+                    <option value="Hadir">✅ Hadir</option>
+                    <option value="Belum">⏳ Belum Hadir</option>
+                </select>
+                <select id="filterCert" onchange="renderTable()" class="bg-slate-900 border border-slate-700/80 focus:border-brand-400 focus:outline-none rounded-xl py-2 px-3 text-xs text-slate-200 cursor-pointer transition-colors">
+                    <option value="all">Semua Sertifikat</option>
+                    <option value="Terkirim">📨 Terkirim</option>
+                    <option value="Mock">📋 Mock</option>
+                    <option value="Belum">⏳ Belum Dikirim</option>
+                </select>
+            </div>
+            <button onclick="loadStudents()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-4 py-2 text-xs font-semibold transition-all">
+                <span>↺</span>
+                <span>Refresh</span>
+            </button>
+        </div>
+
+        <!-- Student Database Table -->
+        <section class="bg-darkcard border border-slate-800/80 rounded-2xl shadow-xl shadow-black/20 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/40 text-slate-400 uppercase text-[10px] tracking-wider font-semibold border-b border-slate-800/80">
+                            <th class="py-4 px-6">Nama Lengkap</th>
+                            <th class="py-4 px-6">NIM</th>
+                            <th class="py-4 px-6">Email Target</th>
+                            <th class="py-4 px-6">Kehadiran</th>
+                            <th class="py-4 px-6">Sertifikat</th>
+                            <th class="py-4 px-6 text-right">Opsi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody" class="divide-y divide-slate-800/50 text-slate-300 text-sm">
+                        <tr>
+                            <td colspan="6" class="py-12 text-center text-slate-500 text-xs">
+                                Memuat database mahasiswa...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===== MODAL: CREATE / EDIT ===== -->
+    <div class="modal-overlay" id="formModal">
+        <div class="bg-darkcard border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative animate-slideUp">
+            <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-brand-400 to-transparent"></div>
+            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-base font-bold font-outfit text-white" id="formModalTitle">Tambah Mahasiswa</h3>
+                <button class="text-slate-400 hover:text-white" onclick="closeModal('formModal')">✕</button>
+            </div>
+            <div class="p-6">
+                <input type="hidden" id="editId"/>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Nama Lengkap *</label>
+                        <input type="text" id="fNama" placeholder="contoh: Budi Santoso" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-400 transition-all placeholder-slate-600"/>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">NIM *</label>
+                        <input type="text" id="fNim" placeholder="contoh: 2021001" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-400 transition-all placeholder-slate-600"/>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Email *</label>
+                        <input type="email" id="fEmail" placeholder="contoh: budi@email.com" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-400 transition-all placeholder-slate-600"/>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-slate-900/40 border-t border-slate-800 flex justify-end gap-3">
+                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-semibold transition-all" onclick="closeModal('formModal')">Batal</button>
+                <button class="px-4 py-2 bg-gradient-to-r from-brand-400 to-brand-500 hover:from-brand-500 hover:to-brand-600 text-darkbg font-bold rounded-xl text-sm transition-all" onclick="submitForm()" id="formSubmitBtn">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: DELETE CONFIRM ===== -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="bg-darkcard border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative animate-slideUp">
+            <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-rose-500 to-transparent"></div>
+            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-base font-bold font-outfit text-rose-400">Hapus Mahasiswa</h3>
+                <button class="text-slate-400 hover:text-white" onclick="closeModal('deleteModal')">✕</button>
+            </div>
+            <div class="p-6">
+                <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 mb-4 text-sm text-rose-300">
+                    Anda akan menghapus: <strong id="delName" class="text-white"></strong><br/>
+                    <span class="text-xs text-rose-400/80 mt-1 block">Data, QR code, dan sertifikat akan dihapus permanen.</span>
+                </div>
+                <p class="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan.</p>
+            </div>
+            <div class="px-6 py-4 bg-slate-900/40 border-t border-slate-800 flex justify-end gap-3">
+                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-semibold transition-all" onclick="closeModal('deleteModal')">Batal</button>
+                <button class="px-4 py-2 bg-rose-900/80 hover:bg-rose-800 text-rose-200 border border-rose-700 rounded-xl text-sm font-semibold transition-all" onclick="confirmDelete()" id="delConfirmBtn">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: QR PREVIEW ===== -->
+    <div class="modal-overlay" id="qrModal">
+        <div class="bg-darkcard border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative animate-slideUp">
+            <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-brand-400 to-transparent"></div>
+            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-base font-bold font-outfit text-white">Preview QR Tiket</h3>
+                <button class="text-slate-400 hover:text-white" onclick="closeModal('qrModal')">✕</button>
+            </div>
+            <div class="p-6 flex flex-col items-center">
+                <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-200">
+                    <img id="qrPreviewImg" src="" alt="QR Code" class="w-48 h-48 object-contain"/>
+                </div>
+                <p id="qrPreviewName" class="mt-4 font-semibold text-white text-base text-center">—</p>
+                <p id="qrPreviewNim" class="font-bold text-brand-400 text-sm mt-0.5"></p>
+            </div>
+            <div class="px-6 py-4 bg-slate-900/40 border-t border-slate-800 flex gap-3">
+                <a id="qrDownloadBtn" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-semibold transition-all" href="#" download>⬇ Download</a>
+                <button class="flex-1 py-2 bg-gradient-to-r from-brand-400 to-brand-500 hover:from-brand-500 hover:to-brand-600 text-darkbg font-bold rounded-xl text-sm transition-all" onclick="window.print()">🖨 Cetak</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
+
+    <script>
+      let allStudents = [];
+      let deleteTargetId = null;
+
+      async function loadStudents() {
+        try {
+          const res = await fetch('/api/students');
+          allStudents = await res.json();
+          renderTable();
+          updateStats();
+        } catch(e) {
+          showToast('Gagal memuat data', 'error');
+        }
+      }
+
+      function updateStats() {
+        const total = allStudents.length;
+        const hadir = allStudents.filter(s => s.status_hadir === 'Hadir').length;
+        const belum = total - hadir;
+        const cert = allStudents.filter(s => s.cert_terkirim === 'Terkirim' || s.cert_terkirim === 'Mock').length;
+        document.getElementById('st-total').textContent = total;
+        document.getElementById('st-hadir').textContent = hadir;
+        document.getElementById('st-belum').textContent = belum;
+        document.getElementById('st-cert').textContent = cert;
+      }
+
+      function renderTable() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        const fStatus = document.getElementById('filterStatus').value;
+        const fCert = document.getElementById('filterCert').value;
+
+        let data = allStudents.filter(s => {
+          const matchQ = !q || s.nama.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+          const matchStatus = fStatus === 'all' || s.status_hadir === fStatus;
+          const certVal = s.cert_terkirim || 'Belum';
+          const matchCert = fCert === 'all' || certVal === fCert;
+          return matchQ && matchStatus && matchCert;
+        });
+
+        const tbody = document.getElementById('studentTableBody');
+        if (!data.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-slate-500 text-xs">Tidak ada data ditemukan</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = data.map(s => {
+          const initials = s.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+          const certVal = s.cert_terkirim || 'Belum';
+          const certBadge = certVal === 'Terkirim'
+            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">📨 Terkirim</span>`
+            : certVal === 'Mock'
+              ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">📋 Mock</span>`
+              : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">⏳ Belum</span>`;
+          const certTime = s.cert_waktu_kirim ? `<div class="text-[10px] text-slate-500 mt-1">${s.cert_waktu_kirim}</div>` : '';
+
+          const statusBadge = s.status_hadir === 'Hadir'
+            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ Hadir</span>`
+            : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">⏳ Belum</span>`;
+          const waktu = s.waktu_hadir ? `<div class="text-[10px] text-slate-500 mt-1">${s.waktu_hadir}</div>` : '';
+
+          const certActLink = s.status_hadir === 'Hadir'
+            ? `<a class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-400/10 text-brand-300 border border-brand-400/20 hover:bg-brand-400/20 transition-all flex items-center gap-1.5" href="/sertifikat/${s.id_mhs}" target="_blank">📄 Sertifikat</a>`
+            : `<span class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-850 text-slate-500 border border-slate-850 opacity-40 cursor-not-allowed flex items-center gap-1.5">📄 Sertifikat</span>`;
+
+          return `<tr class="hover:bg-slate-900/20 transition-colors">
+            <td class="py-4 px-6">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-500 to-brand-400 flex items-center justify-center font-bold text-xs text-darkbg">${initials}</div>
+                <div class="font-semibold text-white">${s.nama}</div>
+              </div>
+            </td>
+            <td class="py-4 px-6 text-slate-400 font-mono text-xs">${s.nim}</td>
+            <td class="py-4 px-6 text-slate-400 text-xs">${s.email}</td>
+            <td class="py-4 px-6">${statusBadge}${waktu}</td>
+            <td class="py-4 px-6">${certBadge}${certTime}</td>
+            <td class="py-4 px-6">
+              <div class="flex justify-end gap-2">
+                <button class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all" onclick="openEditModal('${s.id_mhs}')">✏️ Edit</button>
+                <button class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all" onclick="openQrModal('${s.id_mhs}','${s.nama}','${s.nim}')">🔲 QR</button>
+                ${certActLink}
+                <button class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-all" onclick="openDeleteModal('${s.id_mhs}','${s.nama}')">🗑️ Hapus</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      }
+
+      // ---- CREATE MODAL ----
+      function openCreateModal() {
+        document.getElementById('formModalTitle').textContent = 'Tambah Mahasiswa';
+        document.getElementById('formSubmitBtn').textContent = '＋ Tambah';
+        document.getElementById('editId').value = '';
+        ['fNama','fNim','fEmail'].forEach(id => document.getElementById(id).value = '');
+        openModal('formModal');
+      }
+
+      // ---- EDIT MODAL ----
+      function openEditModal(id) {
+        const s = allStudents.find(s => s.id_mhs === id);
+        if (!s) return;
+        document.getElementById('formModalTitle').textContent = 'Edit Mahasiswa';
+        document.getElementById('formSubmitBtn').textContent = '💾 Simpan Perubahan';
+        document.getElementById('editId').value = id;
+        document.getElementById('fNama').value = s.nama;
+        document.getElementById('fNim').value = s.nim;
+        document.getElementById('fEmail').value = s.email;
+        openModal('formModal');
+      }
+
+      // ---- SUBMIT FORM ----
+      async function submitForm() {
+        const editId = document.getElementById('editId').value;
+        const payload = {
+          nama: document.getElementById('fNama').value.trim(),
+          nim: document.getElementById('fNim').value.trim(),
+          email: document.getElementById('fEmail').value.trim(),
+        };
+        if (!payload.nama || !payload.nim || !payload.email) {
+          showToast('Nama, NIM, dan Email wajib diisi.', 'error'); return;
+        }
+        const btn = document.getElementById('formSubmitBtn');
+        btn.disabled = true; btn.textContent = 'Menyimpan…';
+        try {
+          let res;
+          if (editId) {
+            res = await fetch(`/api/students/${editId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+          } else {
+            res = await fetch('/api/students', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+          }
+          const data = await res.json();
+          if (res.ok && data.status !== 'error') {
+            showToast(data.message || 'Berhasil!', 'success');
+            closeModal('formModal');
+            await loadStudents();
+          } else {
+            showToast(data.message || 'Terjadi kesalahan.', 'error');
+          }
+        } catch(e) {
+          showToast('Koneksi gagal.', 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      // ---- DELETE MODAL ----
+      function openDeleteModal(id, nama) {
+        deleteTargetId = id;
+        document.getElementById('delName').textContent = nama;
+        openModal('deleteModal');
+      }
+      async function confirmDelete() {
+        if (!deleteTargetId) return;
+        const btn = document.getElementById('delConfirmBtn');
+        btn.disabled = true; btn.textContent = 'Menghapus…';
+        try {
+          const res = await fetch(`/api/students/${deleteTargetId}`, { method:'DELETE' });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(data.message, 'success');
+            closeModal('deleteModal');
+            await loadStudents();
+          } else {
+            showToast(data.message || 'Hapus gagal.', 'error');
+          }
+        } catch(e) {
+          showToast('Koneksi gagal.', 'error');
+        } finally {
+          btn.disabled = false; btn.textContent = 'Ya, Hapus';
+          deleteTargetId = null;
+        }
+      }
+
+      // ---- QR MODAL ----
+      function openQrModal(id, nama, nim) {
+        const url = `/assets/qrcodes/${id}.png`;
+        document.getElementById('qrPreviewImg').src = url;
+        document.getElementById('qrPreviewName').textContent = nama;
+        document.getElementById('qrPreviewNim').textContent = nim;
+        document.getElementById('qrDownloadBtn').href = url;
+        document.getElementById('qrDownloadBtn').download = `qr_${nim}.png`;
+        openModal('qrModal');
+      }
+
+      // ---- MODAL UTILS ----
+      function openModal(id) { document.getElementById(id).classList.add('open'); }
+      function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+      document.querySelectorAll('.modal-overlay').forEach(el => {
+        el.addEventListener('click', e => { if(e.target === el) el.classList.remove('open'); });
+      });
+
+      // ---- TOAST ----
+      function showToast(msg, type='success') {
+        const t = document.createElement('div');
+        t.className = `flex items-center gap-3 bg-slate-900 border ${type==='success'?'border-emerald-500/40':'border-rose-500/40'} rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 shadow-xl shadow-black/40 animate-slideUp`;
+        t.innerHTML = `<span>${type==='success'?'✅':'❌'}</span><span>${msg}</span>`;
+        document.getElementById('toast').appendChild(t);
+        setTimeout(()=>t.remove(), 4000);
+      }
+
+      // ---- IMPORT EXCEL ----
+      async function importExcel(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const spinner = document.getElementById('excel-spinner');
+        spinner.classList.remove('hidden');
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          const r = await fetch('/import-excel', { method: 'POST', body: fd });
+          const d = await r.json();
+          showToast(d.message, d.status === 'success' ? 'success' : 'error');
+          if (d.status === 'success') loadStudents();
+        } catch { showToast('Koneksi gagal.', 'error'); }
+        spinner.classList.add('hidden');
+        input.value = '';
+      }
+
+      // INIT
+      loadStudents();
+      setInterval(loadStudents, 30000);
+    </script>
+</body>
+</html>

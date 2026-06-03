@@ -1,0 +1,10 @@
+{
+    "mappings": [
+        {
+            "handle": "2F",
+            "original_text": "DUMMY TEMPLATE FOR TESTING",
+            "mapped_to": "nama"
+        }
+    ],
+    "custom_texts": {}
+}

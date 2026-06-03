@@ -1,0 +1,21 @@
+# Kredensial & Lingkungan (Keamanan)
+.env
+
+# Database Lokal
+*.db
+*.sqlite3
+
+# Lingkungan Virtual Python (Ukuran Besar)
+venv/
+.venv/
+env/
+
+# Cache Python (Sampah Sistem)
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# File OS (Opsional, tapi bagus untuk dipasang)
+.DS_Store
+Thumbs.db
