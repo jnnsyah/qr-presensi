@@ -88,13 +88,34 @@
                     <p class="text-xs text-slate-500 font-medium">Panitia Presensi Berbahagialah</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-6 text-sm font-semibold">
+            
+            <!-- Desktop Nav Menu -->
+            <div class="hidden md:flex items-center space-x-6 text-sm font-semibold">
                 <a href="/" class="text-slate-400 hover:text-white transition-colors">Dashboard</a>
                 <a href="/mahasiswa" class="text-slate-400 hover:text-white transition-colors">Mahasiswa</a>
                 <a href="/scanner" class="text-brand-300 font-bold border-b-2 border-brand-400 pb-1">Scanner</a>
                 <a href="/custom-sertifikat" class="text-slate-400 hover:text-white transition-colors">Sertifikat</a>
                 <a href="/custom-email" class="text-slate-400 hover:text-white transition-colors">Custom Email</a>
             </div>
+
+            <!-- Hamburger Button -->
+            <div class="flex md:hidden">
+                <button id="mobile-menu-btn" class="text-slate-400 hover:text-white focus:outline-none" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="hamburger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Nav Menu Panel -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800 bg-darkcard px-4 py-3 space-y-2">
+            <a href="/" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Dashboard</a>
+            <a href="/mahasiswa" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Mahasiswa</a>
+            <a href="/scanner" class="block px-3 py-2 rounded-lg text-base font-semibold text-brand-300 bg-brand-400/10">Scanner</a>
+            <a href="/custom-sertifikat" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Sertifikat</a>
+            <a href="/custom-email" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Custom Email</a>
         </div>
     </header>
 
@@ -219,10 +240,32 @@
 
     <script>
         let html5Qrcode = null;
+        let scannerState = 'stopped'; // 'stopped' | 'starting' | 'scanning'
         let isCamActive = false;
         let lastScannedCode = null;
         let lastScanTime = 0;
         let sessionLog = [];
+
+        // Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const hamburgerIcon = document.getElementById('hamburger-icon');
+        const closeIcon = document.getElementById('close-icon');
+
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', () => {
+                const isExpanded = !mobileMenu.classList.contains('hidden');
+                if (isExpanded) {
+                    mobileMenu.classList.add('hidden');
+                    hamburgerIcon.classList.remove('hidden');
+                    closeIcon.classList.add('hidden');
+                } else {
+                    mobileMenu.classList.remove('hidden');
+                    hamburgerIcon.classList.add('hidden');
+                    closeIcon.classList.remove('hidden');
+                }
+            });
+        }
 
         // Synthesize Beep audio (zero file request)
         function playBeep(statusType) {
@@ -280,7 +323,10 @@
 
         // Start HTML5 high-sensitivity webcam scanner
         function startScanner() {
-            if (isCamActive) return;
+            if (scannerState !== 'stopped') return;
+
+            scannerState = 'starting';
+            isCamActive = true;
 
             document.getElementById('scanner-placeholder').classList.add('hidden');
             document.getElementById('scan-frame-overlay').classList.remove('hidden');
@@ -306,26 +352,49 @@
                 config,
                 onScanSuccess
             ).then(() => {
-                isCamActive = true;
+                if (scannerState === 'stopped') {
+                    // Stopped while starting up
+                    try {
+                        html5Qrcode.stop().catch(err => {
+                            console.error("Async stop after start resolved threw:", err);
+                        });
+                    } catch (err) {
+                        console.error("Sync stop after start resolved threw:", err);
+                    }
+                } else {
+                    scannerState = 'scanning';
+                }
             }).catch(err => {
                 console.error("Camera startup error", err);
-                resetUI();
-                alert("Gagal memuat kamera. Mohon pastikan izin kamera aktif pada peramban.");
+                if (scannerState === 'starting') {
+                    resetUI();
+                    alert("Gagal memuat kamera. Mohon pastikan izin kamera aktif pada peramban.");
+                }
             });
         }
 
         function stopScanner() {
-            if (!isCamActive) return;
-            html5Qrcode.stop().then(() => {
-                resetUI();
-            }).catch(err => {
-                console.error(err);
-                resetUI();
-            });
+            if (scannerState === 'stopped') return;
+
+            const oldHtml5Qrcode = html5Qrcode;
+            resetUI();
+
+            if (oldHtml5Qrcode) {
+                try {
+                    oldHtml5Qrcode.stop().then(() => {
+                        console.log("Camera stopped successfully.");
+                    }).catch(err => {
+                        console.error("Error stopping camera asynchronously:", err);
+                    });
+                } catch (err) {
+                    console.error("Error stopping camera synchronously:", err);
+                }
+            }
         }
 
         function resetUI() {
             isCamActive = false;
+            scannerState = 'stopped';
             document.getElementById('scanner-placeholder').classList.remove('hidden');
             document.getElementById('scan-frame-overlay').classList.add('hidden');
             document.getElementById('btn-toggle-cam').classList.remove('hidden');

@@ -35,6 +35,53 @@
     nav a{color:#94a3b8;text-decoration:none;font-size:0.875rem;font-weight:600;transition:0.2s;padding-bottom:4px;border-bottom:2px solid transparent;}
     nav a:hover{color:#fff;}
     nav a.active{color:#d7c191;border-bottom-color:var(--gold);font-weight:700;}
+    .menu-btn {
+      display: none;
+      cursor: pointer;
+      color: #94a3b8;
+    }
+    .menu-btn:hover {
+      color: #fff;
+    }
+    .hidden {
+      display: none !important;
+    }
+    @media (max-width: 768px) {
+      nav {
+        padding: 0 16px;
+        position: relative;
+      }
+      .menu-btn {
+        display: block;
+      }
+      nav .nav-links {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 80px;
+        left: 0;
+        right: 0;
+        background: #161d30;
+        border-bottom: 1px solid #2e2e3a;
+        padding: 16px;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      nav .nav-links.active {
+        display: flex;
+      }
+      nav a {
+        padding: 8px 16px;
+        width: 100%;
+        border-bottom: none;
+        border-left: 2px solid transparent;
+      }
+      nav a.active {
+        border-bottom-color: transparent;
+        border-left-color: var(--gold);
+        background: rgba(197,160,89,0.1);
+      }
+    }
 
     .page{max-width:960px;margin:0 auto;padding:32px 24px;}
 
@@ -108,6 +155,12 @@
       <span class="brand-title">QR-PRESENSI</span>
       <span class="brand-sub">Panitia Presensi Berbahagialah</span>
     </div>
+  </div>
+  <div class="menu-btn" id="mobile-menu-btn" onclick="toggleMenu()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:24px;height:24px;">
+      <path id="hamburger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
   </div>
   <div class="nav-links">
     <a href="/">Dashboard</a>
@@ -253,6 +306,21 @@
     } catch (e) {
       showToast('Koneksi gagal.', 'error');
       btn.disabled = false; btn.textContent = '📨 Kirim Ulang Sertifikat';
+    }
+  }
+
+  function toggleMenu() {
+    const navLinks = document.querySelector('.nav-links');
+    const hamburgerIcon = document.getElementById('hamburger-icon');
+    const closeIcon = document.getElementById('close-icon');
+    const isActive = navLinks.classList.toggle('active');
+    
+    if (isActive) {
+      hamburgerIcon.classList.add('hidden');
+      closeIcon.classList.remove('hidden');
+    } else {
+      hamburgerIcon.classList.remove('hidden');
+      closeIcon.classList.add('hidden');
     }
   }
 

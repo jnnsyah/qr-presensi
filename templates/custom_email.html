@@ -84,13 +84,34 @@
                     <p class="text-xs text-slate-500 font-medium">Panitia Presensi Berbahagialah</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-6 text-sm font-semibold">
+            
+            <!-- Desktop Nav Menu -->
+            <div class="hidden md:flex items-center space-x-6 text-sm font-semibold">
                 <a href="/" class="text-slate-400 hover:text-white transition-colors">Dashboard</a>
                 <a href="/mahasiswa" class="text-slate-400 hover:text-white transition-colors">Mahasiswa</a>
                 <a href="/scanner" class="text-slate-400 hover:text-white transition-colors">Scanner</a>
                 <a href="/custom-sertifikat" class="text-slate-400 hover:text-white transition-colors">Sertifikat</a>
                 <a href="/custom-email" class="text-brand-300 font-bold border-b-2 border-brand-400 pb-1">Custom Email</a>
             </div>
+
+            <!-- Hamburger Button -->
+            <div class="flex md:hidden">
+                <button id="mobile-menu-btn" class="text-slate-400 hover:text-white focus:outline-none" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="hamburger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Nav Menu Panel -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800 bg-darkcard px-4 py-3 space-y-2">
+            <a href="/" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Dashboard</a>
+            <a href="/mahasiswa" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Mahasiswa</a>
+            <a href="/scanner" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Scanner</a>
+            <a href="/custom-sertifikat" class="block px-3 py-2 rounded-lg text-base font-semibold text-slate-400 hover:text-white">Sertifikat</a>
+            <a href="/custom-email" class="block px-3 py-2 rounded-lg text-base font-semibold text-brand-300 bg-brand-400/10">Custom Email</a>
         </div>
     </header>
 
@@ -270,6 +291,27 @@
                 saveBtn.innerHTML = `<svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Simpan Kustomisasi</span>`;
             }
         });
+
+        // Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const hamburgerIcon = document.getElementById('hamburger-icon');
+        const closeIcon = document.getElementById('close-icon');
+
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', () => {
+                const isExpanded = !mobileMenu.classList.contains('hidden');
+                if (isExpanded) {
+                    mobileMenu.classList.add('hidden');
+                    hamburgerIcon.classList.remove('hidden');
+                    closeIcon.classList.add('hidden');
+                } else {
+                    mobileMenu.classList.remove('hidden');
+                    hamburgerIcon.classList.add('hidden');
+                    closeIcon.classList.remove('hidden');
+                }
+            });
+        }
 
         // Initialize page
         fetchEmailConfig();
