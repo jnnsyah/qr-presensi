@@ -329,6 +329,16 @@ init_db()
 EMAIL_CONFIG_FILE = os.path.join('assets', 'email_config.json')
 CERT_CONFIG_FILE = os.path.join('assets', 'cert_config.json')
 
+def clear_certificates_cache():
+    cert_dir = os.path.join('assets', 'certificates')
+    if os.path.exists(cert_dir):
+        for f in os.listdir(cert_dir):
+            if f.endswith('.pdf'):
+                try:
+                    os.remove(os.path.join(cert_dir, f))
+                except Exception as e:
+                    print(f"Error deleting cached certificate {f}: {e}", flush=True)
+
 def load_email_config():
     default_config = {
         "qr_email_subject": "Tiket Presensi QR - {nama}",
@@ -421,9 +431,8 @@ def send_student_cert_email(student):
     subject = cfg['cert_email_subject'].format(nama=student['nama'], nim=student['nim'], waktu=waktu)
     body = cfg['cert_email_body'].format(nama=student['nama'], nim=student['nim'], waktu=waktu)
     
-    pdf_path = os.path.join('assets', 'certificates', f"{student['id_mhs']}.pdf")
-    if not os.path.exists(pdf_path):
-        pdf_path = generate_dxf_certificate(student['nama'], student['nim'], waktu, student['id_mhs'], student['email'])
+    # Always regenerate certificate to ensure it reflects the latest template edits
+    pdf_path = generate_dxf_certificate(student['nama'], student['nim'], waktu, student['id_mhs'], student['email'])
         
     return send_email(student['email'], subject, body, attachment_path=pdf_path, attachment_name=f"certificate_{student['nim']}.pdf")
 
@@ -497,12 +506,6 @@ def generate_image_certificate(student_name, student_nim, checkin_time, id_mhs, 
             'email': student_email,
         }
         
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-        
         for field_cfg in cfg.get('fields', []):
             field_type = field_cfg.get('field', 'custom')
             text = field_data.get(field_type, field_cfg.get('custom_text', ''))
@@ -518,6 +521,24 @@ def generate_image_certificate(student_name, student_nim, checkin_time, id_mhs, 
             # Scale down font for long names
             if field_type == 'nama' and len(text) > 22:
                 font_size = max(16, int(font_size * 22 / len(text)))
+            
+            # Select fonts dynamically based on bold property to match the frontend editor preview
+            if bold:
+                font_paths = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                    "C:\\Windows\\Fonts\\georgiab.ttf",
+                    "C:\\Windows\\Fonts\\timesbd.ttf",
+                    "C:\\Windows\\Fonts\\arialbd.ttf"
+                ]
+            else:
+                font_paths = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    "C:\\Windows\\Fonts\\georgia.ttf",
+                    "C:\\Windows\\Fonts\\times.ttf",
+                    "C:\\Windows\\Fonts\\arial.ttf"
+                ]
             
             font = None
             for fp in font_paths:
@@ -1153,6 +1174,10 @@ def api_cert_upload_image():
             os.remove(old)
     dest = os.path.join('assets', f'cert_bg.{ext}')
     file.save(dest)
+    
+    # Clear cached certificate PDFs since background template has changed
+    clear_certificates_cache()
+    
     try:
         img = Image.open(dest)
         W, H = img.size
@@ -1193,6 +1218,8 @@ def api_cert_config():
         try:
             with open(img_cfg_path, 'w') as f:
                 json.dump(data, f, indent=2)
+            # Clear cached certificate PDFs since template layout config has changed
+            clear_certificates_cache()
             return jsonify({"status": "success", "message": "Konfigurasi sertifikat berhasil disimpan."})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -1352,9 +1379,8 @@ def cert_preview(id_mhs):
         return "Mahasiswa tidak ditemukan.", 404
     if student['status_hadir'] != 'Hadir':
         return "Sertifikat belum tersedia — mahasiswa belum hadir.", 400
-    pdf_path = os.path.join('assets', 'certificates', f"{id_mhs}.pdf")
-    if not os.path.exists(pdf_path):
-        pdf_path = generate_dxf_certificate(student['nama'], student['nim'], student['waktu_hadir'], id_mhs, student['email'])
+    # Always regenerate certificate to ensure it reflects the latest template edits
+    pdf_path = generate_dxf_certificate(student['nama'], student['nim'], student['waktu_hadir'], id_mhs, student['email'])
     return send_file(pdf_path, mimetype='application/pdf')
 
 # GET /download-template-excel
