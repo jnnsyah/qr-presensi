@@ -88,6 +88,40 @@
             to   { opacity: 1; transform: translateY(0); }
         }
         .slide-down { animation: slideDown 0.3s ease forwards; }
+
+        /* Row sending state */
+        @keyframes rowPulse {
+            0%, 100% { background-color: rgba(59, 130, 246, 0.05); }
+            50%       { background-color: rgba(59, 130, 246, 0.12); }
+        }
+        .row-sending { animation: rowPulse 1s ease-in-out infinite; }
+        .row-ok {
+            background-color: rgba(34, 197, 94, 0.08) !important;
+            transition: background-color 0.5s ease;
+        }
+        .row-fail {
+            background-color: rgba(239, 68, 68, 0.08) !important;
+            transition: background-color 0.5s ease;
+        }
+
+        /* Inline btn spinner */
+        .btn-sending {
+            pointer-events: none;
+            opacity: 0.75;
+        }
+        .btn-spin {
+            display: inline-block;
+            width: 12px; height: 12px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 
@@ -429,6 +463,7 @@
                             <th class="py-4 px-6">Email Target</th>
                             <th class="py-4 px-6">Status</th>
                             <th class="py-4 px-6">Waktu Presensi</th>
+                            <th class="py-4 px-6 text-center">QR</th>
                             <th class="py-4 px-6 text-center">Sertifikat</th>
                             <th class="py-4 px-6 text-right">Opsi</th>
                         </tr>
@@ -436,7 +471,7 @@
                     <tbody id="student-table-body" class="divide-y divide-slate-800/50 text-slate-300 text-sm">
                         <!-- Dynamic Rows injected here -->
                         <tr>
-                            <td colspan="7" class="py-12 text-center text-slate-500 text-xs">
+                            <td colspan="8" class="py-12 text-center text-slate-500 text-xs">
                                 Memuat database mahasiswa...
                             </td>
                         </tr>
@@ -793,7 +828,7 @@
             if (filtered.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="py-12 text-center text-slate-500 text-xs">
+                        <td colspan="8" class="py-12 text-center text-slate-500 text-xs">
                             ${students.length === 0 ? 'Data kosong. Silakan masuk ke menu Mahasiswa untuk menambah data.' : 'Pencarian tidak ditemukan.'}
                         </td>
                     </tr>
@@ -813,6 +848,19 @@
 
                 const timeStamp = s.waktu_hadir ? s.waktu_hadir : `<span class="text-slate-600">-</span>`;
 
+                // QR badge
+                const qrVal = s.qr_terkirim || 'Belum';
+                let qrBadge;
+                if (qrVal === 'Terkirim') {
+                    qrBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">📨 Terkirim</span>`;
+                } else if (qrVal === 'Mock') {
+                    qrBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">📋 Mock</span>`;
+                } else {
+                    qrBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-800 text-slate-500 border border-slate-700">⏳ Belum</span>`;
+                }
+                const qrCell = `<div class="flex justify-center">${qrBadge}</div>`;
+
+                // Certificate badge
                 const certVal = s.cert_terkirim || 'Belum';
                 let certBadge;
                 if (certVal === 'Terkirim') {
@@ -827,22 +875,23 @@
                     : `<div class="flex justify-center">${certBadge}</div>`;
 
                 return `
-                    <tr class="hover:bg-slate-900/30 transition-colors">
+                    <tr id="row-${s.id_mhs}" class="hover:bg-slate-900/30 transition-colors">
                         <td class="py-4 px-6 font-semibold text-white">${s.nama}</td>
                         <td class="py-4 px-6 font-mono text-xs text-slate-400">${s.nim}</td>
                         <td class="py-4 px-6 text-slate-400 text-xs">${s.email}</td>
                         <td class="py-4 px-6">${statusBadge}</td>
                         <td class="py-4 px-6 text-xs font-mono text-slate-400">${timeStamp}</td>
+                        <td class="py-4 px-6 text-center">${qrCell}</td>
                         <td class="py-4 px-6 text-center">${certCell}</td>
                         <td class="py-4 px-6 text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <button onclick="toggleAttendance('${s.id_mhs}')" class="btn-animate text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
                                     ${isHadir ? 'Reset' : 'Hadirkan'}
                                 </button>
-                                <button onclick="sendQR('${s.id_mhs}')" class="btn-animate text-xs font-medium text-brand-300 hover:text-white bg-brand-400/10 hover:bg-brand-500/20 px-3 py-1.5 rounded-lg border border-brand-400/20" title="Kirim QR Code Ticket via Email">
+                                <button id="btn-qr-${s.id_mhs}" onclick="sendQR('${s.id_mhs}', this)" class="btn-animate text-xs font-medium text-brand-300 hover:text-white bg-brand-400/10 hover:bg-brand-500/20 px-3 py-1.5 rounded-lg border border-brand-400/20" title="Kirim QR Code Ticket via Email">
                                     ✉ QR
                                 </button>
-                                <button onclick="sendCert('${s.id_mhs}')" ${isHadir ? '' : 'disabled'} class="btn-animate text-xs font-medium text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed" title="Kirim Sertifikat via Email">
+                                <button id="btn-cert-${s.id_mhs}" onclick="sendCert('${s.id_mhs}', this)" ${isHadir ? '' : 'disabled'} class="btn-animate text-xs font-medium text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed" title="Kirim Sertifikat via Email">
                                     ✉ Sertif
                                 </button>
                             </div>
@@ -959,35 +1008,87 @@
             }
         }
 
+        // ============================================================
+        // SINGLE-SEND HELPERS (with inline loading progress)
+        // ============================================================
+
+        /** Start loading state for a row's send button */
+        function _startSendBtn(btn, labelText) {
+            btn.dataset.origHtml = btn.innerHTML;
+            btn.innerHTML = `<span class="btn-spin"></span>${labelText}`;
+            btn.classList.add('btn-sending');
+            btn.disabled = true;
+        }
+
+        /** Restore button to original state */
+        function _endSendBtn(btn) {
+            if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+            btn.classList.remove('btn-sending');
+            btn.disabled = false;
+        }
+
+        /** Flash the whole table row with a result colour for 2 seconds */
+        function _flashRow(id_mhs, isOk) {
+            const row = document.getElementById(`row-${id_mhs}`);
+            if (!row) return;
+            row.classList.remove('row-sending', 'row-ok', 'row-fail');
+            row.classList.add(isOk ? 'row-ok' : 'row-fail');
+            setTimeout(() => row.classList.remove('row-ok', 'row-fail'), 2000);
+        }
+
         // Send QR code email manually
-        async function sendQR(id_mhs) {
+        async function sendQR(id_mhs, btn) {
+            const row = document.getElementById(`row-${id_mhs}`);
+            if (row) row.classList.add('row-sending');
+            if (btn) _startSendBtn(btn, 'Kirim...');
+
             try {
                 const response = await fetch(`/api/students/${id_mhs}/send-qr`, { method: 'POST' });
                 const data = await response.json();
-                if (data.status === 'success') {
-                    showAlert('success', data.message);
+                if (btn) _endSendBtn(btn);
+
+                if (data.status === 'success' || data.status === 'warning') {
+                    _flashRow(id_mhs, true);
+                    showAlert(data.status === 'success' ? 'success' : 'warning', data.message);
                     fetchStudents();
                 } else {
+                    _flashRow(id_mhs, false);
                     showAlert('error', data.message);
                 }
             } catch (err) {
-                showAlert('error', "Gagal mengirim tiket QR.");
+                if (btn) _endSendBtn(btn);
+                _flashRow(id_mhs, false);
+                showAlert('error', 'Gagal mengirim tiket QR.');
+            } finally {
+                if (row) row.classList.remove('row-sending');
             }
         }
 
         // Send Certificate email manually
-        async function sendCert(id_mhs) {
+        async function sendCert(id_mhs, btn) {
+            const row = document.getElementById(`row-${id_mhs}`);
+            if (row) row.classList.add('row-sending');
+            if (btn) _startSendBtn(btn, 'Kirim...');
+
             try {
                 const response = await fetch(`/api/students/${id_mhs}/send-cert`, { method: 'POST' });
                 const data = await response.json();
-                if (data.status === 'success') {
-                    showAlert('success', data.message);
+                if (btn) _endSendBtn(btn);
+
+                if (data.status === 'success' || data.status === 'warning') {
+                    _flashRow(id_mhs, true);
+                    showAlert(data.status === 'success' ? 'success' : 'warning', data.message);
                     fetchStudents();
                 } else {
+                    _flashRow(id_mhs, false);
                     showAlert('error', data.message);
                 }
             } catch (err) {
-                showAlert('error', "Gagal mengirim email sertifikat.");
+                if (btn) _endSendBtn(btn);
+                _flashRow(id_mhs, false);
+                showAlert('error', 'Gagal mengirim email sertifikat.');
+            } finally {
+                if (row) row.classList.remove('row-sending');
             }
         }
 
