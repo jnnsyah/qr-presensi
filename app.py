@@ -5,11 +5,14 @@ import datetime
 import smtplib
 import json
 import io
+import time
+import threading
+from queue import Queue, Empty
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from flask import Flask, request, jsonify, render_template, send_file, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_file, send_from_directory, Response
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
 import ezdxf
@@ -712,74 +715,239 @@ def import_dummy():
     finally:
         conn.close()
 
-# B. POST /blast-qr
+# ---------------------------------------------------------
+# Background Blast Job System (Thread-based + SSE progress)
+# ---------------------------------------------------------
+
 BLAST_QR_RESULT_FILE = os.path.join('assets', 'blast_qr_result.json')
 BLAST_CERT_RESULT_FILE = os.path.join('assets', 'blast_cert_result.json')
 
+# Global job state — one active blast at a time per type
+_blast_jobs = {}  # key: 'qr' or 'cert', value: dict of job state
+_blast_queues = {}  # key: 'qr' or 'cert', value: list of Queue (one per SSE subscriber)
+_blast_lock = threading.Lock()
+
+BLAST_SEND_DELAY = float(os.environ.get('BLAST_SEND_DELAY', '0.3'))  # seconds between each send
+
+
+def _get_job(kind):
+    return _blast_jobs.get(kind, {})
+
+
+def _broadcast_event(kind, event_data):
+    """Push a SSE event dict to all active subscribers of this blast type."""
+    with _blast_lock:
+        queues = _blast_queues.get(kind, [])
+        dead = []
+        for q in queues:
+            try:
+                q.put_nowait(event_data)
+            except Exception:
+                dead.append(q)
+        for q in dead:
+            try:
+                queues.remove(q)
+            except Exception:
+                pass
+
+
+def _run_blast_qr(students):
+    kind = 'qr'
+    total = len(students)
+    success_list, failed_list = [], []
+
+    _blast_jobs[kind] = {
+        'running': True, 'total': total, 'done': 0,
+        'success': [], 'failed': [], 'started_at': datetime.datetime.now().isoformat()
+    }
+    _broadcast_event(kind, {'event': 'start', 'total': total})
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    for i, s in enumerate(students):
+        try:
+            send_student_qr_email(dict(s))
+            qr_status = 'Terkirim' if os.environ.get('SMTP_SERVER') else 'Mock'
+            qr_time = datetime.datetime.now().strftime("%d %B %Y, %H:%M:%S")
+            cursor.execute("UPDATE mahasiswa SET qr_terkirim=?, qr_waktu_kirim=? WHERE id_mhs=?",
+                           (qr_status, qr_time, s['id_mhs']))
+            conn.commit()
+            entry = {'id_mhs': s['id_mhs'], 'nama': s['nama'], 'email': s['email']}
+            success_list.append(entry)
+            _blast_jobs[kind]['success'].append(entry)
+            _broadcast_event(kind, {'event': 'progress', 'index': i + 1, 'total': total,
+                                    'status': 'ok', 'nama': s['nama'], 'email': s['email']})
+        except Exception as e:
+            entry = {'id_mhs': s['id_mhs'], 'nama': s['nama'], 'email': s['email'], 'error': str(e)}
+            failed_list.append(entry)
+            _blast_jobs[kind]['failed'].append(entry)
+            _broadcast_event(kind, {'event': 'progress', 'index': i + 1, 'total': total,
+                                    'status': 'fail', 'nama': s['nama'], 'email': s['email'], 'error': str(e)})
+        _blast_jobs[kind]['done'] = i + 1
+        if BLAST_SEND_DELAY > 0 and i < total - 1:
+            time.sleep(BLAST_SEND_DELAY)
+
+    conn.close()
+
+    result = {'success': success_list, 'failed': failed_list, 'timestamp': datetime.datetime.now().isoformat()}
+    with open(BLAST_QR_RESULT_FILE, 'w') as f:
+        json.dump(result, f)
+
+    _blast_jobs[kind]['running'] = False
+    _blast_jobs[kind]['finished_at'] = datetime.datetime.now().isoformat()
+    _broadcast_event(kind, {'event': 'done', 'total': total,
+                            'ok': len(success_list), 'fail': len(failed_list),
+                            'success': success_list, 'failed': failed_list})
+
+
+def _run_blast_cert(students):
+    kind = 'cert'
+    total = len(students)
+    success_list, failed_list = [], []
+
+    _blast_jobs[kind] = {
+        'running': True, 'total': total, 'done': 0,
+        'success': [], 'failed': [], 'started_at': datetime.datetime.now().isoformat()
+    }
+    _broadcast_event(kind, {'event': 'start', 'total': total})
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    for i, s in enumerate(students):
+        try:
+            sent, _ = send_student_cert_email(dict(s))
+            cert_status = 'Terkirim' if sent else 'Mock'
+            cert_time = datetime.datetime.now().strftime("%d %B %Y, %H:%M:%S")
+            cursor.execute("UPDATE mahasiswa SET cert_terkirim=?, cert_waktu_kirim=? WHERE id_mhs=?",
+                           (cert_status, cert_time, s['id_mhs']))
+            conn.commit()
+            entry = {'id_mhs': s['id_mhs'], 'nama': s['nama'], 'email': s['email']}
+            success_list.append(entry)
+            _blast_jobs[kind]['success'].append(entry)
+            _broadcast_event(kind, {'event': 'progress', 'index': i + 1, 'total': total,
+                                    'status': 'ok', 'nama': s['nama'], 'email': s['email']})
+        except Exception as e:
+            entry = {'id_mhs': s['id_mhs'], 'nama': s['nama'], 'email': s['email'], 'error': str(e)}
+            failed_list.append(entry)
+            _blast_jobs[kind]['failed'].append(entry)
+            _broadcast_event(kind, {'event': 'progress', 'index': i + 1, 'total': total,
+                                    'status': 'fail', 'nama': s['nama'], 'email': s['email'], 'error': str(e)})
+        _blast_jobs[kind]['done'] = i + 1
+        if BLAST_SEND_DELAY > 0 and i < total - 1:
+            time.sleep(BLAST_SEND_DELAY)
+
+    conn.close()
+
+    result = {'success': success_list, 'failed': failed_list, 'timestamp': datetime.datetime.now().isoformat()}
+    with open(BLAST_CERT_RESULT_FILE, 'w') as f:
+        json.dump(result, f)
+
+    _blast_jobs[kind]['running'] = False
+    _blast_jobs[kind]['finished_at'] = datetime.datetime.now().isoformat()
+    _broadcast_event(kind, {'event': 'done', 'total': total,
+                            'ok': len(success_list), 'fail': len(failed_list),
+                            'success': success_list, 'failed': failed_list})
+
+
+# B. POST /blast-qr  (now launches background thread)
 @app.route('/blast-qr', methods=['POST'])
 def blast_qr():
+    kind = 'qr'
+    job = _get_job(kind)
+    if job.get('running'):
+        return jsonify({'status': 'warning', 'message': 'Blast QR sedang berjalan, harap tunggu.'}), 409
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM mahasiswa")
     students = cursor.fetchall()
     conn.close()
-    
-    if not students:
-        return jsonify({"status": "warning", "message": "Tidak ada data mahasiswa."}), 400
-    
-    success_list, failed_list = [], []
-    for s in students:
-        try:
-            send_student_qr_email(s)
-            success_list.append({"id_mhs": s['id_mhs'], "nama": s['nama'], "email": s['email']})
-        except Exception as e:
-            failed_list.append({"id_mhs": s['id_mhs'], "nama": s['nama'], "email": s['email'], "error": str(e)})
-    
-    result = {"success": success_list, "failed": failed_list, "timestamp": datetime.datetime.now().isoformat()}
-    with open(BLAST_QR_RESULT_FILE, 'w') as f:
-        json.dump(result, f)
-    
-    total, ok, fail = len(students), len(success_list), len(failed_list)
-    msg = f"QR Tiket terkirim: {ok}/{total} berhasil, {fail} gagal."
-    status = "success" if fail == 0 else ("warning" if ok > 0 else "error")
-    return jsonify({"status": status, "message": msg, "success": success_list, "failed": failed_list}), 200
 
-# POST /blast-cert
+    if not students:
+        return jsonify({'status': 'warning', 'message': 'Tidak ada data mahasiswa.'}), 400
+
+    t = threading.Thread(target=_run_blast_qr, args=(students,), daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'message': f'Blast QR dimulai untuk {len(students)} mahasiswa.',
+                    'total': len(students)}), 202
+
+
+# POST /blast-cert  (now launches background thread)
 @app.route('/blast-cert', methods=['POST'])
 def blast_cert():
+    kind = 'cert'
+    job = _get_job(kind)
+    if job.get('running'):
+        return jsonify({'status': 'warning', 'message': 'Blast Sertifikat sedang berjalan, harap tunggu.'}), 409
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM mahasiswa WHERE status_hadir = 'Hadir'")
     students = cursor.fetchall()
     conn.close()
-    
+
     if not students:
-        return jsonify({"status": "warning", "message": "Belum ada mahasiswa yang hadir."}), 400
-    
-    success_list, failed_list = [], []
-    conn2 = get_db()
-    cur2 = conn2.cursor()
-    for s in students:
+        return jsonify({'status': 'warning', 'message': 'Belum ada mahasiswa yang hadir.'}), 400
+
+    t = threading.Thread(target=_run_blast_cert, args=(students,), daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'message': f'Blast Sertifikat dimulai untuk {len(students)} mahasiswa.',
+                    'total': len(students)}), 202
+
+
+# GET /blast-status/<kind> — Poll current job state (fallback for SSE)
+@app.route('/blast-status/<kind>', methods=['GET'])
+def blast_status(kind):
+    if kind not in ('qr', 'cert'):
+        return jsonify({'status': 'error', 'message': 'Invalid blast type'}), 400
+    job = dict(_get_job(kind))
+    if not job:
+        return jsonify({'running': False, 'done': 0, 'total': 0, 'success': [], 'failed': []})
+    return jsonify(job)
+
+
+# GET /blast-progress/<kind> — SSE stream for real-time progress
+@app.route('/blast-progress/<kind>')
+def blast_progress(kind):
+    if kind not in ('qr', 'cert'):
+        return jsonify({'status': 'error', 'message': 'Invalid blast type'}), 400
+
+    q = Queue(maxsize=500)
+    with _blast_lock:
+        if kind not in _blast_queues:
+            _blast_queues[kind] = []
+        _blast_queues[kind].append(q)
+
+    # If job already done, immediately push final state
+    job = _get_job(kind)
+    if job and not job.get('running') and job.get('done', 0) > 0:
+        q.put_nowait({'event': 'done', 'total': job.get('total', 0),
+                      'ok': len(job.get('success', [])), 'fail': len(job.get('failed', [])),
+                      'success': job.get('success', []), 'failed': job.get('failed', [])})
+
+    def generate():
         try:
-            sent, _ = send_student_cert_email(dict(s))
-            cert_status = 'Terkirim' if sent else 'Mock'
-            cert_time = datetime.datetime.now().strftime("%d %B %Y, %H:%M:%S")
-            cur2.execute("UPDATE mahasiswa SET cert_terkirim=?, cert_waktu_kirim=? WHERE id_mhs=?",
-                         (cert_status, cert_time, s['id_mhs']))
-            success_list.append({"id_mhs": s['id_mhs'], "nama": s['nama'], "email": s['email']})
-        except Exception as e:
-            failed_list.append({"id_mhs": s['id_mhs'], "nama": s['nama'], "email": s['email'], "error": str(e)})
-    conn2.commit()
-    conn2.close()
-    
-    result = {"success": success_list, "failed": failed_list, "timestamp": datetime.datetime.now().isoformat()}
-    with open(BLAST_CERT_RESULT_FILE, 'w') as f:
-        json.dump(result, f)
-    
-    total, ok, fail = len(students), len(success_list), len(failed_list)
-    msg = f"Sertifikat terkirim: {ok}/{total} berhasil, {fail} gagal."
-    status = "success" if fail == 0 else ("warning" if ok > 0 else "error")
-    return jsonify({"status": status, "message": msg, "success": success_list, "failed": failed_list}), 200
+            while True:
+                try:
+                    data = q.get(timeout=25)  # 25s heartbeat interval
+                    payload = json.dumps(data)
+                    yield f'data: {payload}\n\n'
+                    if data.get('event') == 'done':
+                        break
+                except Empty:
+                    # Send heartbeat comment to keep connection alive
+                    yield ': heartbeat\n\n'
+        finally:
+            with _blast_lock:
+                try:
+                    _blast_queues[kind].remove(q)
+                except Exception:
+                    pass
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 # POST /blast-qr-retry
 @app.route('/blast-qr-retry', methods=['POST'])

@@ -50,32 +50,44 @@
         }
 
         /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #111827;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #374151;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #4b5563;
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
         /* Micro-animation transitions */
-        .btn-animate {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        .btn-animate { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-animate:active { transform: scale(0.95); }
 
-        .btn-animate:active {
-            transform: scale(0.95);
+        /* Progress bar animation */
+        @keyframes progressShimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
         }
+        .progress-bar-shimmer {
+            background: linear-gradient(90deg,
+                #c5a059 0%, #e8c57a 40%, #c5a059 60%, #9d7134 100%);
+            background-size: 200% auto;
+            animation: progressShimmer 1.8s linear infinite;
+        }
+        .progress-bar-shimmer-cert {
+            background: linear-gradient(90deg,
+                #22c55e 0%, #4ade80 40%, #22c55e 60%, #16a34a 100%);
+            background-size: 200% auto;
+            animation: progressShimmer 1.8s linear infinite;
+        }
+        @keyframes fadeInRow {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-row { animation: fadeInRow 0.25s ease forwards; }
+
+        /* Blast panel slide-in */
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .slide-down { animation: slideDown 0.3s ease forwards; }
     </style>
 </head>
 
@@ -226,29 +238,70 @@
             </div>
         </section>
 
-        <!-- Blast Results Panel -->
-        <div id="blast-results" class="hidden mb-6 bg-darkcard border border-slate-700 rounded-2xl p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h3 id="blast-results-title" class="text-sm font-bold text-white font-outfit">Hasil Blast Email</h3>
-                <button onclick="document.getElementById('blast-results').classList.add('hidden')"
-                    class="text-slate-400 hover:text-white text-xs">Tutup ✕</button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <p class="text-xs font-semibold text-emerald-400 uppercase mb-2">✅ Berhasil (<span
-                            id="blast-ok-count">0</span>)</p>
-                    <div id="blast-ok-list" class="space-y-1 max-h-32 overflow-y-auto"></div>
+        <!-- ============================
+             BLAST PROGRESS PANEL
+             ============================ -->
+        <div id="blast-panel" class="hidden mb-6 bg-darkcard border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/40 slide-down">
+            <!-- Panel Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div id="blast-panel-icon" class="w-8 h-8 rounded-lg flex items-center justify-center"></div>
+                    <div>
+                        <h3 id="blast-panel-title" class="text-sm font-bold text-white font-outfit">Blast Email</h3>
+                        <p id="blast-panel-sub" class="text-[11px] text-slate-500">Mempersiapkan pengiriman...</p>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-xs font-semibold text-red-400 uppercase mb-2">❌ Gagal (<span
-                            id="blast-fail-count">0</span>)</p>
-                    <div id="blast-fail-list" class="space-y-1 max-h-32 overflow-y-auto mb-3"></div>
-                    <button id="retry-btn" onclick="retryFailed()"
-                        class="hidden w-full py-2 text-xs font-semibold text-red-300 border border-red-400/30 rounded-xl hover:bg-red-400/10 transition-all">🔄
-                        Kirim Ulang yang Gagal</button>
+                <div class="flex items-center gap-3">
+                    <span id="blast-panel-counter" class="text-xs font-mono font-bold text-slate-300">0 / 0</span>
+                    <button onclick="closeBlastPanel()" class="text-slate-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
+                </div>
+            </div>
+
+            <!-- Progress Bar Track -->
+            <div class="px-6 pt-4 pb-2">
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div id="blast-progress-bar" class="h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 mt-1.5">
+                    <span id="blast-pct-text">0%</span>
+                    <span id="blast-eta-text"></span>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-3 gap-3 px-6 pb-4">
+                <div class="bg-slate-900/60 rounded-xl px-3 py-2 text-center">
+                    <div id="bp-total" class="text-lg font-bold font-outfit text-white">—</div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide">Target</div>
+                </div>
+                <div class="bg-emerald-900/20 border border-emerald-800/30 rounded-xl px-3 py-2 text-center">
+                    <div id="bp-ok" class="text-lg font-bold font-outfit text-emerald-400">0</div>
+                    <div class="text-[10px] text-emerald-600 uppercase tracking-wide">Berhasil</div>
+                </div>
+                <div class="bg-rose-900/20 border border-rose-800/30 rounded-xl px-3 py-2 text-center">
+                    <div id="bp-fail" class="text-lg font-bold font-outfit text-rose-400">0</div>
+                    <div class="text-[10px] text-rose-600 uppercase tracking-wide">Gagal</div>
+                </div>
+            </div>
+
+            <!-- Live Feed -->
+            <div class="px-6 pb-2">
+                <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-2">Live Feed</p>
+                <div id="blast-feed" class="space-y-1 max-h-44 overflow-y-auto pr-1 scroll-smooth"></div>
+            </div>
+
+            <!-- Retry / Done Controls -->
+            <div id="blast-panel-footer" class="hidden px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-3">
+                <div id="blast-done-msg" class="text-sm font-semibold text-white"></div>
+                <div class="flex gap-2">
+                    <button id="blast-retry-btn" class="hidden px-4 py-2 text-xs font-bold text-rose-300 border border-rose-500/40 rounded-xl hover:bg-rose-500/10 transition-all" onclick="retryFailed()">🔄 Kirim Ulang Gagal</button>
+                    <button onclick="closeBlastPanel()" class="px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl transition-all">Tutup</button>
                 </div>
             </div>
         </div>
+
+        <!-- Old hidden blast-results div kept for retryFailed compatibility -->
+        <div id="blast-results" class="hidden"></div>
 
         <!-- KPI Summary Cards -->
         <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
@@ -455,8 +508,265 @@
 
     <script>
         let currentStudents = [];
+        let currentBlastType = 'qr';
+        let _blastFailedIds = [];
+        let _blastSSE = null;
+        let _blastStartTime = null;
 
-        // Fetch students and reload metrics
+        // ============================================================
+        // BLAST PANEL HELPERS
+        // ============================================================
+        function openBlastPanel(kind, title, iconHtml, barClass) {
+            currentBlastType = kind;
+            _blastFailedIds = [];
+            _blastStartTime = Date.now();
+
+            document.getElementById('blast-panel-title').textContent = title;
+            document.getElementById('blast-panel-sub').textContent = 'Mempersiapkan pengiriman...';
+            document.getElementById('blast-panel-icon').innerHTML = iconHtml;
+            document.getElementById('blast-progress-bar').className = `h-2.5 rounded-full transition-all duration-500 ${barClass}`;
+            document.getElementById('blast-progress-bar').style.width = '0%';
+            document.getElementById('blast-pct-text').textContent = '0%';
+            document.getElementById('blast-eta-text').textContent = '';
+            document.getElementById('blast-panel-counter').textContent = '0 / 0';
+            document.getElementById('bp-total').textContent = '—';
+            document.getElementById('bp-ok').textContent = '0';
+            document.getElementById('bp-fail').textContent = '0';
+            document.getElementById('blast-feed').innerHTML = '';
+            document.getElementById('blast-panel-footer').classList.add('hidden');
+            document.getElementById('blast-retry-btn').classList.add('hidden');
+            document.getElementById('blast-done-msg').textContent = '';
+
+            const panel = document.getElementById('blast-panel');
+            panel.classList.remove('hidden');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeBlastPanel() {
+            document.getElementById('blast-panel').classList.add('hidden');
+            if (_blastSSE) { _blastSSE.close(); _blastSSE = null; }
+        }
+
+        function updateBlastProgress(index, total, okCount, failCount) {
+            const pct = total > 0 ? Math.round((index / total) * 100) : 0;
+            document.getElementById('blast-progress-bar').style.width = pct + '%';
+            document.getElementById('blast-pct-text').textContent = pct + '%';
+            document.getElementById('blast-panel-counter').textContent = `${index} / ${total}`;
+            document.getElementById('bp-total').textContent = total;
+            document.getElementById('bp-ok').textContent = okCount;
+            document.getElementById('bp-fail').textContent = failCount;
+
+            // ETA
+            if (index > 0 && _blastStartTime) {
+                const elapsed = (Date.now() - _blastStartTime) / 1000;
+                const rate = index / elapsed; // per second
+                const remaining = (total - index) / rate;
+                if (remaining > 1) {
+                    const m = Math.floor(remaining / 60);
+                    const s = Math.floor(remaining % 60);
+                    document.getElementById('blast-eta-text').textContent = m > 0
+                        ? `ETA ~${m}m ${s}s`
+                        : `ETA ~${s}s`;
+                } else {
+                    document.getElementById('blast-eta-text').textContent = 'Hampir selesai...';
+                }
+            }
+        }
+
+        function appendFeedRow(status, nama, email, error) {
+            const feed = document.getElementById('blast-feed');
+            const row = document.createElement('div');
+            row.className = `fade-in-row flex items-center gap-2 text-xs py-1 border-b border-slate-800/60`;
+
+            if (status === 'ok') {
+                row.innerHTML = `
+                    <span class="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">✓</span>
+                    <span class="font-medium text-slate-200 truncate" title="${nama}">${nama}</span>
+                    <span class="text-slate-500 truncate flex-1" title="${email}">${email}</span>
+                `;
+            } else {
+                row.innerHTML = `
+                    <span class="flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[10px] font-bold">✕</span>
+                    <span class="font-medium text-rose-300 truncate" title="${nama}">${nama}</span>
+                    <span class="text-rose-500/70 truncate flex-1 text-[10px]" title="${error || ''}">GAGAL${error ? ': ' + error.substring(0, 40) : ''}</span>
+                `;
+            }
+            feed.appendChild(row);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function finishBlastPanel(total, ok, fail, failedList) {
+            // Full bar
+            document.getElementById('blast-progress-bar').style.width = '100%';
+            document.getElementById('blast-pct-text').textContent = '100%';
+            document.getElementById('blast-eta-text').textContent = '';
+            document.getElementById('blast-panel-sub').textContent = 'Selesai!';
+
+            const msg = `✅ ${ok} berhasil` + (fail > 0 ? ` &nbsp;|&nbsp; ❌ ${fail} gagal` : ' — semua berhasil!');
+            document.getElementById('blast-done-msg').innerHTML = msg;
+            document.getElementById('blast-panel-footer').classList.remove('hidden');
+
+            if (fail > 0 && failedList.length > 0) {
+                _blastFailedIds = failedList.map(s => s.id_mhs);
+                document.getElementById('blast-retry-btn').classList.remove('hidden');
+            }
+
+            fetchStudents();
+        }
+
+        // ============================================================
+        // BLAST TRIGGER FUNCTIONS (SSE-based)
+        // ============================================================
+        async function triggerBlast() {
+            const btn = document.getElementById('btn-blast');
+            const spinner = document.getElementById('blast-spinner');
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/blast-qr', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.status === 409) {
+                    showAlert('warning', data.message); return;
+                }
+                if (response.status === 400) {
+                    showAlert('error', data.message); return;
+                }
+
+                openBlastPanel('qr', '🎫 Blast QR Tiket',
+                    `<svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>`,
+                    'progress-bar-shimmer');
+                document.getElementById('blast-panel-sub').textContent = `Mengirim ke ${data.total} mahasiswa...`;
+
+                // Open SSE stream
+                subscribeBlastProgress('qr');
+
+            } catch (err) {
+                showAlert('error', 'Koneksi ke backend gagal.');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        async function triggerBlastCert() {
+            const btn = document.getElementById('btn-blast-cert');
+            const spinner = document.getElementById('blast-cert-spinner');
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/blast-cert', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.status === 409) {
+                    showAlert('warning', data.message); return;
+                }
+                if (response.status === 400) {
+                    showAlert('error', data.message); return;
+                }
+
+                openBlastPanel('cert', '🎓 Blast Sertifikat',
+                    `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+                    'progress-bar-shimmer-cert');
+                document.getElementById('blast-panel-sub').textContent = `Mengirim ke ${data.total} mahasiswa hadir...`;
+
+                // Open SSE stream
+                subscribeBlastProgress('cert');
+
+            } catch (err) {
+                showAlert('error', 'Koneksi ke backend gagal.');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function subscribeBlastProgress(kind) {
+            if (_blastSSE) _blastSSE.close();
+            _blastSSE = new EventSource(`/blast-progress/${kind}`);
+            let okCount = 0, failCount = 0, total = 0;
+
+            _blastSSE.onmessage = function(ev) {
+                let data;
+                try { data = JSON.parse(ev.data); } catch { return; }
+
+                if (data.event === 'start') {
+                    total = data.total;
+                    document.getElementById('bp-total').textContent = total;
+
+                } else if (data.event === 'progress') {
+                    total = data.total;
+                    if (data.status === 'ok') okCount++; else failCount++;
+                    updateBlastProgress(data.index, data.total, okCount, failCount);
+                    appendFeedRow(data.status, data.nama, data.email, data.error);
+
+                } else if (data.event === 'done') {
+                    okCount = data.ok;
+                    failCount = data.fail;
+                    updateBlastProgress(data.total, data.total, okCount, failCount);
+                    finishBlastPanel(data.total, okCount, failCount, data.failed || []);
+                    _blastSSE.close();
+                    _blastSSE = null;
+                }
+            };
+
+            _blastSSE.onerror = function() {
+                // SSE connection dropped — try status poll fallback
+                _blastSSE && _blastSSE.close();
+                _blastSSE = null;
+                pollBlastStatus(kind);
+            };
+        }
+
+        // Fallback polling if SSE fails
+        function pollBlastStatus(kind) {
+            const interval = setInterval(async () => {
+                try {
+                    const r = await fetch(`/blast-status/${kind}`);
+                    const d = await r.json();
+                    if (!d.running && d.done > 0) {
+                        clearInterval(interval);
+                        finishBlastPanel(d.total, d.success.length, d.failed.length, d.failed);
+                    } else {
+                        updateBlastProgress(d.done, d.total,
+                            (d.success || []).length, (d.failed || []).length);
+                    }
+                } catch { clearInterval(interval); }
+            }, 1500);
+        }
+
+        // Retry failed sends
+        async function retryFailed() {
+            const btn = document.getElementById('blast-retry-btn');
+            const ids = _blastFailedIds;
+            if (!ids.length) return;
+            btn.disabled = true;
+            btn.textContent = 'Mengirim ulang...';
+
+            const endpoint = currentBlastType === 'cert' ? '/blast-cert-retry' : '/blast-qr-retry';
+            try {
+                const r = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
+                });
+                const d = await r.json();
+                showAlert(d.status === 'success' ? 'success' : 'warning', d.message);
+                // Append results to feed
+                (d.success || []).forEach(s => appendFeedRow('ok', s.nama, s.email));
+                (d.failed || []).forEach(s => appendFeedRow('fail', s.nama, s.email, s.error));
+                fetchStudents();
+                _blastFailedIds = (d.failed || []).map(s => s.id_mhs);
+                if (_blastFailedIds.length === 0) btn.classList.add('hidden');
+            } catch {
+                showAlert('error', 'Koneksi gagal.');
+            }
+            btn.disabled = false;
+            btn.textContent = '🔄 Kirim Ulang Gagal';
+        }
+
         async function fetchStudents() {
             try {
                 const response = await fetch('/api/students');
@@ -632,80 +942,6 @@
                 btn.disabled = false;
                 spinner.classList.add('hidden');
             }
-        }
-
-        // Trigger Blast QR
-        async function triggerBlast() {
-            const btn = document.getElementById('btn-blast');
-            const spinner = document.getElementById('blast-spinner');
-            btn.disabled = true;
-            spinner.classList.remove('hidden');
-            try {
-                const response = await fetch('/blast-qr', { method: 'POST' });
-                const data = await response.json();
-                showAlert(data.status === 'success' ? 'success' : 'warning', data.message);
-                showBlastResults('QR Tiket', data.success || [], data.failed || [], 'qr');
-                fetchStudents();
-            } catch (err) {
-                showAlert('error', "Koneksi ke backend gagal.");
-            } finally {
-                btn.disabled = false;
-                spinner.classList.add('hidden');
-            }
-        }
-
-        // Trigger Blast Cert
-        async function triggerBlastCert() {
-            const btn = document.getElementById('btn-blast-cert');
-            const spinner = document.getElementById('blast-cert-spinner');
-            btn.disabled = true;
-            spinner.classList.remove('hidden');
-            try {
-                const response = await fetch('/blast-cert', { method: 'POST' });
-                const data = await response.json();
-                showAlert(data.status === 'success' ? 'success' : (data.status === 'warning' ? 'warning' : 'error'), data.message);
-                showBlastResults('Sertifikat', data.success || [], data.failed || [], 'cert');
-                fetchStudents();
-            } catch (err) {
-                showAlert('error', "Koneksi ke backend gagal.");
-            } finally {
-                btn.disabled = false;
-                spinner.classList.add('hidden');
-            }
-        }
-
-        let currentBlastType = 'qr';
-        function showBlastResults(label, success, failed, type) {
-            currentBlastType = type;
-            const panel = document.getElementById('blast-results');
-            document.getElementById('blast-results-title').textContent = 'Hasil Blast ' + label;
-            document.getElementById('blast-ok-count').textContent = success.length;
-            document.getElementById('blast-fail-count').textContent = failed.length;
-            const okList = document.getElementById('blast-ok-list');
-            const failList = document.getElementById('blast-fail-list');
-            okList.innerHTML = success.map(s => `<div class="text-xs text-slate-400 py-0.5">✅ ${s.nama} <span class="text-slate-600">(${s.email})</span></div>`).join('') || '<div class="text-xs text-slate-600">Tidak ada</div>';
-            failList.innerHTML = failed.map(s => `<div class="text-xs text-red-400 py-0.5">❌ ${s.nama} <span class="text-slate-600">(${s.error || 'gagal'})</span></div>`).join('') || '<div class="text-xs text-slate-600">Tidak ada</div>';
-            const retryBtn = document.getElementById('retry-btn');
-            if (failed.length > 0) { retryBtn.classList.remove('hidden'); retryBtn.dataset.ids = JSON.stringify(failed.map(s => s.id_mhs)); }
-            else retryBtn.classList.add('hidden');
-            panel.classList.remove('hidden');
-            panel.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        async function retryFailed() {
-            const btn = document.getElementById('retry-btn');
-            const ids = JSON.parse(btn.dataset.ids || '[]');
-            if (!ids.length) return;
-            btn.disabled = true; btn.textContent = 'Mengirim ulang...';
-            const endpoint = currentBlastType === 'cert' ? '/blast-cert-retry' : '/blast-qr-retry';
-            try {
-                const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
-                const d = await r.json();
-                showAlert(d.status, d.message);
-                showBlastResults(currentBlastType === 'cert' ? 'Sertifikat (Retry)' : 'QR Tiket (Retry)', d.success || [], d.failed || [], currentBlastType);
-                fetchStudents();
-            } catch { showAlert('error', 'Koneksi gagal.'); }
-            btn.disabled = false; btn.textContent = '🔄 Kirim Ulang yang Gagal';
         }
 
         // Toggle Single Attendance status (Manual)
